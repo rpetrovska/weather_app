@@ -7,30 +7,25 @@ import retrofit2.http.Query
 
 // --- 1. Retrofit Data Models ---
 data class WeatherApiResponse(
-    val forecast: Forecast
-)
+    val forecast: Forecast)
 
 data class Forecast(
     @SerializedName("forecastday")
-    val forecastDay: List<ForecastDay>
-)
+    val forecastDay: List<ForecastDay>)
 
 data class ForecastDay(
     val date: String,
     val day: Day,
-    val hour: List<Hour>
-)
+    val hour: List<Hour>)
 
 data class Day(
     @SerializedName("mintemp_c") val minTempC: Double,
     @SerializedName("maxtemp_c") val maxTempC: Double,
     @SerializedName("avghumidity") val avgHumidity: Double,
-    @SerializedName("maxwind_kph") val maxWindKph: Double
-)
+    @SerializedName("maxwind_kph") val maxWindKph: Double)
 
 data class Hour(
-    @SerializedName("wind_dir") val windDir: String
-)
+    @SerializedName("wind_dir") val windDir: String)
 
 // --- 2. Local Application Data Model ---
 data class ForecastMetrics(
@@ -38,8 +33,7 @@ data class ForecastMetrics(
     val maxTemp: Double,
     val humidity: Double,
     val windSpeed: Double,
-    val windDir: String
-)
+    val windDir: String)
 
 // --- 3. Retrofit API Interface ---
 interface WeatherApiService {
@@ -49,8 +43,7 @@ interface WeatherApiService {
         @Query("q") city: String,
         @Query("days") days: Int = 2,
         @Query("aqi") aqi: String = "no"
-    ): Call<WeatherApiResponse>
-}
+    ): Call<WeatherApiResponse> }
 
 // --- 4. Main Function ---
 fun main() {
@@ -76,8 +69,7 @@ fun main() {
             val response = apiService.getForecast(apiKey = apiKey, city = city).execute()
 
             if (!response.isSuccessful || response.body() == null) {
-                throw RuntimeException("HTTP Error: ${response.code()}")
-            }
+                throw RuntimeException("HTTP Error: ${response.code()}")}
 
             val weatherData = response.body()!!
             val tomorrow = weatherData.forecast.forecastDay[1]
@@ -93,12 +85,9 @@ fun main() {
                 maxTemp = day.maxTempC,
                 humidity = day.avgHumidity,
                 windSpeed = day.maxWindKph,
-                windDir = hour12.windDir
-            )
+                windDir = hour12.windDir)
         } catch (e: Exception) {
-            println("Error fetching data for $city: ${e.message}")
-        }
-    }
+            println("Error fetching data for $city: ${e.message}")}}
 
     val sortedDates = dates.sorted()
     val header = "%-15s".format("City") + sortedDates.joinToString("") { "%-64s".format(it) }
