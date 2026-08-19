@@ -1,9 +1,38 @@
-import java.net.URI
-import java.net.http.HttpClient
-import java.net.http.HttpRequest
-import java.net.http.HttpResponse
-import org.json.JSONObject
+import com.google.gson.annotations.SerializedName
+import retrofit2.Call
+import retrofit2.Retrofit
+import retrofit2.converter.gson.GsonConverterFactory
+import retrofit2.http.GET
+import retrofit2.http.Query
 
+// --- 1. Retrofit Data Models ---
+data class WeatherApiResponse(
+    val forecast: Forecast
+)
+
+data class Forecast(
+    @SerializedName("forecastday")
+    val forecastDay: List<ForecastDay>
+)
+
+data class ForecastDay(
+    val date: String,
+    val day: Day,
+    val hour: List<Hour>
+)
+
+data class Day(
+    @SerializedName("mintemp_c") val minTempC: Double,
+    @SerializedName("maxtemp_c") val maxTempC: Double,
+    @SerializedName("avghumidity") val avgHumidity: Double,
+    @SerializedName("maxwind_kph") val maxWindKph: Double
+)
+
+data class Hour(
+    @SerializedName("wind_dir") val windDir: String
+)
+
+// --- 2. Local Application Data Model ---
 data class ForecastMetrics(
     val minTemp: Double,
     val maxTemp: Double,
@@ -12,44 +41,59 @@ data class ForecastMetrics(
     val windDir: String
 )
 
+// --- 3. Retrofit API Interface ---
+interface WeatherApiService {
+    @GET("v1/forecast.json")
+    fun getForecast(
+        @Query("key") apiKey: String,
+        @Query("q") city: String,
+        @Query("days") days: Int = 2,
+        @Query("aqi") aqi: String = "no"
+    ): Call<WeatherApiResponse>
+}
+
+// --- 4. Main Function ---
 fun main() {
     val apiKey = "7834374a79a3406d9ac135237261808"
-    val baseUrl = "http://api.weatherapi.com/v1/forecast.json"
+    val baseUrl = "http://api.weatherapi.com/"
     val cities = listOf("Chisinau", "Madrid", "Kyiv", "Amsterdam")
+
+    // Initialize Retrofit
+    val retrofit = Retrofit.Builder()
+        .baseUrl(baseUrl)
+        .addConverterFactory(GsonConverterFactory.create())
+        .build()
+
+    val apiService = retrofit.create(WeatherApiService::class.java)
 
     val forecastData = mutableMapOf<String, MutableMap<String, ForecastMetrics>>()
     cities.forEach { forecastData[it] = mutableMapOf() }
 
     val dates = mutableSetOf<String>()
-    val client = HttpClient.newHttpClient()
 
     for (city in cities) {
         try {
-            val url = "$baseUrl?key=$apiKey&q=$city&days=2&aqi=no"
-            val request = HttpRequest.newBuilder().uri(URI.create(url)).GET().build()
-            val response = client.send(request, HttpResponse.BodyHandlers.ofString())
+            val response = apiService.getForecast(apiKey = apiKey, city = city).execute()
 
-            if (response.statusCode() != 200) {
-                throw RuntimeException("HTTP Error: ${response.statusCode()}")
+            if (!response.isSuccessful || response.body() == null) {
+                throw RuntimeException("HTTP Error: ${response.code()}")
             }
 
-            val json = JSONObject(response.body())
-            val tomorrow = json.getJSONObject("forecast")
-                .getJSONArray("forecastday")
-                .getJSONObject(1)
+            val weatherData = response.body()!!
+            val tomorrow = weatherData.forecast.forecastDay[1]
 
-            val date = tomorrow.getString("date")
+            val date = tomorrow.date
             dates.add(date)
 
-            val day = tomorrow.getJSONObject("day")
-            val hour12 = tomorrow.getJSONArray("hour").getJSONObject(12)
+            val day = tomorrow.day
+            val hour12 = tomorrow.hour[12]
 
             forecastData[city]!![date] = ForecastMetrics(
-                minTemp = day.getDouble("mintemp_c"),
-                maxTemp = day.getDouble("maxtemp_c"),
-                humidity = day.getDouble("avghumidity"),
-                windSpeed = day.getDouble("maxwind_kph"),
-                windDir = hour12.getString("wind_dir")
+                minTemp = day.minTempC,
+                maxTemp = day.maxTempC,
+                humidity = day.avgHumidity,
+                windSpeed = day.maxWindKph,
+                windDir = hour12.windDir
             )
         } catch (e: Exception) {
             println("Error fetching data for $city: ${e.message}")
